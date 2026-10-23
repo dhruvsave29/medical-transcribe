@@ -249,5 +249,8 @@ plan.follow_up.
   live transcript with in-order chunk uploads. See docs/handoff-step-3.md.
 - Step 4 ✅ — local Ollama analyzer /api/analyze with validated ClinicalSummary,
   Analysing… CTA state. See docs/handoff-step-4.md.
-- Next: Step 5 (chat drawer). One step per session; use the hand-off prompt
-  template in the PRD (Section 6).
+- Step 5 ✅ — floating chat drawer + /api/chat grounded-refusal assistant. See
+  docs/handoff-step-5.md.
+- Next: Step 6 (final assembly — cold-run checks, docs wrap-up, then GitHub
+  export last). One step per session; use the hand-off prompt template in the
+  PRD (Section 6).
