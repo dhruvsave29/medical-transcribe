@@ -89,12 +89,12 @@ cd backend && .venv/Scripts/python -m uvicorn app.main:app --port 8000     # ter
 
 ```mermaid
 flowchart LR
-    A[Browser mic] --> B[Silero VAD<br/>in-browser, no CDN]
-    B -- speech only,<br/>16 kHz mono WAV chunks --> C[/api/transcribe<br/>faster-whisper small.en]
-    C -- text per chunk --> D[Live transcript<br/>+ WORDS / CHUNKS]
-    D -- full transcript --> E[/api/analyze<br/>local Ollama qwen2.5:3b/]
-    E -- validated JSON --> F[Clinical summary<br/>editable + copyable]
-    D & F --> G[/api/chat<br/>grounded assistant/]
+    A["Browser mic"] --> B["Silero VAD<br/>in-browser, no CDN"]
+    B -- "speech only,<br/>16 kHz mono WAV chunks" --> C["/api/transcribe<br/>faster-whisper small.en"]
+    C -- "text per chunk" --> D["Live transcript<br/>+ WORDS / CHUNKS"]
+    D -- "full transcript" --> E["/api/analyze<br/>local Ollama qwen2.5:3b"]
+    E -- "validated JSON" --> F["Clinical summary<br/>editable + copyable"]
+    D & F --> G["/api/chat<br/>grounded assistant"]
 ```
 
 - **VAD thresholds, not vibes**: 0.45/0.32 with 700 ms redemption, 500 ms pre-speech
