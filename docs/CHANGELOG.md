@@ -93,7 +93,32 @@ change without an entry here.
 
 ## Known gaps (by plan)
 - ASR chunk latency ~1.0× real-time on CPU int8 (fine for live dictation pace).
-- `/api/analyze` + `/api/chat` remain Steps 4–5; mock data still behind the dev toggle.
+- `/api/chat` remains Step 5.
+
+## [0.4.0] — Step 4 — 2026-10-24
+
+### Added
+- `POST /api/analyze` behind the `Analyzer` interface: local Ollama
+  (`qwen2.5:3b` via the OpenAI-compatible `/v1` client, `response_format=json_object`,
+  temperature 0, one parse-retry), responses validated against the PRD 3.3
+  `ClinicalSummary` Pydantic models before leaving the backend.
+- Hostile-LLM coercion in `summary.py`: strings/None/dicts normalized into list
+  fields, medication objects accepted, empty med names dropped — schema stays
+  exact while models wobble.
+- CTA processing state per PRD 2.4: spinner + "Analysing…" + disabled during
+  inference (`.btn--busy` styles).
+- `.env.example`/config: `WHISPER_CPU_THREADS`, `WHISPER_BEAM_SIZE`, `LLM_TIMEOUT_S`.
+- 7 new backend tests (contract, 400/422/503, unreachable LLM, key whitelist);
+  Playwright full-pipeline E2E (`docs/verify_step4_analyze.py`) and real-inference
+  smoke (`docs/smoke_analyze.py`); screenshot `docs/step4-summary.png`.
+
+### Fixed
+- Environment missing Ollama: installed v0.40.9 via winget and pulled qwen2.5:3b;
+  `run.bat` logic now exercises its real install path.
+
+**Run:** `run.bat` (Windows). Note: first analyze after a cold boot takes ~15 s
+(model warm-up in Ollama RAM); then ~5–12 s per summary.
 
 **Run:** `run.bat` (Windows) → http://localhost:5173 (frontend) · http://localhost:8000
 reads `/api/health` (backend). Vite dev server on 5173 proxies `/api` to 8000.
+

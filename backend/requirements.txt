@@ -6,3 +6,4 @@ python-multipart>=0.0.9
 faster-whisper>=1.0,<2
 av>=11,<16
 numpy>=2,<3
+openai>=1.60,<2

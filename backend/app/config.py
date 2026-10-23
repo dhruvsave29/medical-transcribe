@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     llm_base_url: str = "http://127.0.0.1:11434/v1"
     llm_model: str = "qwen2.5:3b"
     llm_api_key: str = "local"
+    llm_timeout_s: int = 180
 
     backend_port: int = 8000
     frontend_port: int = 5173

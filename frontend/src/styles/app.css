@@ -867,3 +867,25 @@ button:disabled {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Processing CTA: spinner while /api/analyze runs (PRD 2.4 'Analysing...') */
+.btn--busy .spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgb(255 255 255 / 35%);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: mediscript-spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+.btn--busy {
+  opacity: 0.85;
+  cursor: progress;
+}
+
+@keyframes mediscript-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

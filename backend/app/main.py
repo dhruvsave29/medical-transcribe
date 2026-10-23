@@ -16,7 +16,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import asr_state
+from . import analyzer_state, asr_state
+from .analyzer import AnalyzerError
 from .asr import TranscriberError, maybe_autoload
 from .config import settings
 
@@ -137,3 +138,38 @@ async def transcribe(
         "text": text,
         "duration_ms": int(round(duration * 1000)),
     }
+
+
+@app.post("/api/analyze")
+async def analyze(request: Request) -> JSONResponse:
+    """Full transcript in, validated ClinicalSummary out (PRD 3.2/3.3).
+
+    Body: {"transcript": "..."} — the validated summary JSON is returned
+    directly. Inference runs on the local Ollama daemon (qwen2.5:3b).
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Body must be JSON.")
+    if not isinstance(body, dict) or not isinstance(body.get("transcript"), str):
+        raise HTTPException(
+            status_code=422, detail="Field 'transcript' (string) is required."
+        )
+    transcript: str = body["transcript"].strip()
+    if not transcript:
+        raise HTTPException(status_code=400, detail="Transcript is empty.")
+
+    try:
+        summary = analyzer_state.analyzer.analyze(transcript)
+    except AnalyzerError as exc:
+        raise HTTPException(status_code=503, detail=str(exc) + " — retry.") from exc
+    except Exception as exc:
+        logger.error("analyze failed: %s", type(exc).__name__)
+        raise HTTPException(
+            status_code=503, detail="Local LLM unavailable — retry."
+        ) from exc
+
+    return JSONResponse(
+        status_code=200,
+        content=jsonable_encoder(summary.model_dump(mode="json")),
+    )

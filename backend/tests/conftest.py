@@ -1,4 +1,4 @@
-"""Shared test fixtures: stub the ASR model so tests never touch the network.
+"""Shared test fixtures: stub ASR + analyzer so tests never touch the network.
 
 MEDISCRIPT_ASR_AUTOLOAD=0 is set before importing the app so the background
 preload never starts in tests.
@@ -14,14 +14,16 @@ os.environ["MEDISCRIPT_ASR_AUTOLOAD"] = "0"
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from app.analyzer import AnalyzerError, Analyzer  # noqa: E402
 from app.asr import Transcriber  # noqa: E402
+from app.summary import ClinicalSummary  # noqa: E402
 
 
 class StubTranscriber(Transcriber):
     """Deterministic in-memory transcriber for contract tests."""
 
     def __init__(self) -> None:
-        self.calls: list[tuple[int, float]] = []
+        self.calls: list[tuple[float, float]] = []
         self.ready = True
 
     @property
@@ -38,6 +40,29 @@ class StubTranscriber(Transcriber):
             raise TranscriberError(f"audio decode failed: {type(exc).__name__}") from exc
         self.calls.append((duration, float(len(wav_bytes))))
         return "stub hello doctor", duration
+
+
+class StubAnalyzer(Analyzer):
+    """Deterministic analyzer for contract tests."""
+
+    def __init__(self) -> None:
+        self.fail = False
+
+    def analyze(self, transcript: str) -> ClinicalSummary:
+        if self.fail:
+            raise AnalyzerError("LLM output did not match the clinical summary schema")
+        return sample_summary()
+
+
+def sample_summary() -> ClinicalSummary:
+    return ClinicalSummary.model_validate(
+        {
+            "patient": {"name": None, "age": None, "sex": None, "identifiers": []},
+            "chief_complaints": [],
+            "symptoms": {"positive": [], "negative": []},
+            "clinical_summary": "stub summary paragraph",
+        }
+    )
 
 
 def make_wav_pcm(seconds: float = 1.0, rate: int = 16000) -> bytes:

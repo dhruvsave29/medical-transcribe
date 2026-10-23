@@ -174,13 +174,22 @@ export function TranscriptionCard() {
 
       <button
         type="button"
-        className="btn btn--primary btn--block"
+        className={`btn btn--primary btn--block${status === 'processing' ? ' btn--busy' : ''}`}
         onClick={() => void onProcess()}
         disabled={!canProcess}
         aria-label="Process transcript with AI"
       >
-        <Icon name="zap" size={16} className="btn__icon" />
-        Process Transcript with AI
+        {status === 'processing' ? (
+          <>
+            <span className="spinner" aria-hidden="true" />
+            Analysing…
+          </>
+        ) : (
+          <>
+            <Icon name="zap" size={16} className="btn__icon" />
+            Process Transcript with AI
+          </>
+        )}
       </button>
     </section>
   )
