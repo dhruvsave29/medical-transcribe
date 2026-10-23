@@ -1,9 +1,10 @@
 import { create } from 'zustand'
 import { mockSummary } from '../data/mockSummary'
 import { mockTranscript } from '../data/mockTranscript'
+import type { ChunkRecord, RecorderErrorKind } from '../audio/recorder'
 import type { ClinicalSummary } from '../types/clinical'
 
-export type SessionStatus = 'idle' | 'recording' | 'stopped' | 'processing'
+export type SessionStatus = 'idle' | 'recording' | 'stopped' | 'processing' | 'error'
 export type BackendStatus = 'checking' | 'online' | 'offline'
 export type ToastKind = 'info' | 'success' | 'error'
 
@@ -35,6 +36,10 @@ interface SessionState {
   mock: boolean
   backend: BackendStatus
   toasts: ToastItem[]
+  /** Last chunk metadata events from the recorder (dev debug panel). */
+  recorderEvents: ChunkRecord[]
+  /** True once any speech audio has been captured this session. */
+  audioCaptured: boolean
 
   startRecording: () => void
   stopRecording: () => void
@@ -47,6 +52,8 @@ interface SessionState {
   setBackendStatus: (v: BackendStatus) => void
   refreshBackendStatus: () => Promise<void>
   setEditedSummary: (v: string) => void
+  recordChunk: (record: ChunkRecord) => void
+  recorderFailure: (kind: RecorderErrorKind) => void
   pushToast: (kind: ToastKind, message: string, action?: ToastAction) => void
   dismissToast: (id: number) => void
 }
@@ -63,6 +70,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   mock: false,
   backend: 'checking',
   toasts: [],
+  recorderEvents: [],
+  audioCaptured: false,
 
   startRecording: () => {
     if (get().status === 'processing') return
@@ -80,6 +89,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       transcript: '',
       chunkCount: 0,
       liveLabel: null,
+      recorderEvents: [],
+      audioCaptured: false,
     })
   },
 
@@ -124,6 +135,19 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   setBackendStatus: (v) => set({ backend: v }),
 
   setEditedSummary: (v) => set({ summaryEditedText: v }),
+
+  recordChunk: (record) => {
+    set((s) => ({
+      chunkCount: record.index,
+      recorderEvents: [...s.recorderEvents.slice(-39), record],
+      audioCaptured: true,
+    }))
+  },
+
+  recorderFailure: (_kind) => {
+    void _kind
+    set({ status: 'error', liveLabel: null })
+  },
 
   pushToast: (kind, message, action) => {
     const id = ++toastSeq

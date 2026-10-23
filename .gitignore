@@ -1,6 +1,8 @@
 # Node / Vite
 node_modules/
 frontend/dist/
+frontend/public/vad/
+frontend/src/vendor/
 *.tsbuildinfo
 
 # Python

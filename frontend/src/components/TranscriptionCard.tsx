@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSessionStore, wordCountOf } from '../store/sessionStore'
+import { useRecorder } from '../hooks/useRecorder'
+import { RecorderDebugPanel } from './RecorderDebugPanel'
 import { Icon } from './Icon'
 
 export function TranscriptionCard() {
@@ -7,13 +9,13 @@ export function TranscriptionCard() {
   const transcript = useSessionStore((s) => s.transcript)
   const chunkCount = useSessionStore((s) => s.chunkCount)
   const liveLabel = useSessionStore((s) => s.liveLabel)
-  const startRecording = useSessionStore((s) => s.startRecording)
-  const stopRecording = useSessionStore((s) => s.stopRecording)
-  const clearTranscript = useSessionStore((s) => s.clearTranscript)
+  const audioCaptured = useSessionStore((s) => s.audioCaptured)
   const beginProcessing = useSessionStore((s) => s.beginProcessing)
   const endProcessing = useSessionStore((s) => s.endProcessing)
   const setMock = useSessionStore((s) => s.setMock)
   const pushToast = useSessionStore((s) => s.pushToast)
+
+  const { start, stop, saveSession, clearSession } = useRecorder()
 
   const boxRef = useRef<HTMLDivElement>(null)
   const [confirmingClear, setConfirmingClear] = useState(false)
@@ -26,18 +28,11 @@ export function TranscriptionCard() {
     if (el) el.scrollTop = el.scrollHeight
   }, [transcript])
 
-  const onStart = () => {
-    startRecording()
-    pushToast('info', 'Microphone capture and VAD are wired in Step 2 — UI state is already live.')
-  }
-
-  const onStop = () => {
-    stopRecording()
-  }
-
   const onClear = () => {
-    if (!hasText) {
-      clearTranscript()
+    if (status === 'recording') return
+    const willWipe = hasText || chunkCount > 0
+    if (!willWipe) {
+      clearSession()
       return
     }
     if (!confirmingClear) {
@@ -46,12 +41,8 @@ export function TranscriptionCard() {
       return
     }
     setConfirmingClear(false)
-    clearTranscript()
-    pushToast('success', 'Transcript cleared.')
-  }
-
-  const onSave = () => {
-    pushToast('info', 'Audio download activates with recording (Step 2).')
+    clearSession()
+    pushToast('success', 'Transcript and recording cleared.')
   }
 
   const onProcess = async () => {
@@ -94,7 +85,8 @@ export function TranscriptionCard() {
   }
 
   const stripVisible = status === 'recording' || status === 'processing'
-  const liveStrip = liveLabel === 'Analysing…' && status === 'processing' ? 'Analysing…' : liveLabel
+  const liveStrip = status === 'processing' ? 'Analysing…' : liveLabel
+  const canProcess = (status === 'stopped' || status === 'error') && hasText
 
   return (
     <section className="card" aria-labelledby="transcription-title">
@@ -107,7 +99,7 @@ export function TranscriptionCard() {
         <button
           type="button"
           className={`btn btn--primary${status === 'recording' ? ' btn--recording' : ''}`}
-          onClick={onStart}
+          onClick={() => void start()}
           disabled={status === 'recording' || status === 'processing'}
           aria-label="Start microphone recording"
         >
@@ -117,7 +109,7 @@ export function TranscriptionCard() {
         <button
           type="button"
           className="btn btn--danger"
-          onClick={onStop}
+          onClick={() => void stop()}
           disabled={status !== 'recording'}
           aria-label="Stop recording"
         >
@@ -138,10 +130,10 @@ export function TranscriptionCard() {
         <button
           type="button"
           className="btn btn--success"
-          onClick={onSave}
-          disabled
-          aria-label="Save recording (available after Step 2)"
-          title="Audio saving is wired to the recorder in Step 2"
+          onClick={() => void saveSession()}
+          disabled={!audioCaptured || status === 'recording' || status === 'processing'}
+          aria-label="Save recording as WAV"
+          title="Downloads the full session as a 16 kHz WAV (plus transcript .txt when available)"
         >
           <Icon name="download" size={16} className="btn__icon" />
           Save Recording
@@ -178,11 +170,13 @@ export function TranscriptionCard() {
         )}
       </div>
 
+      {import.meta.env.DEV && <RecorderDebugPanel />}
+
       <button
         type="button"
         className="btn btn--primary btn--block"
         onClick={() => void onProcess()}
-        disabled={status !== 'stopped' || !hasText}
+        disabled={!canProcess}
         aria-label="Process transcript with AI"
       >
         <Icon name="zap" size={16} className="btn__icon" />

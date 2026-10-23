@@ -11,6 +11,9 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    // Silero VAD + ONNX Runtime assets are copied into public/vad/ by the
+    // `predev`/`prebuild` npm scripts (copy-vad-assets.mjs), so the VAD runs
+    // fully offline (no CDN) in dev, build and preview.
     envDir: repoRoot,
     server: {
       port: frontendPort,

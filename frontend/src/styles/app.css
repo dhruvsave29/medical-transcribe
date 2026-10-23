@@ -710,6 +710,60 @@ button:disabled {
   color: var(--text-secondary);
 }
 
+/* ============ Recorder debug panel (dev only) ============ */
+
+.debug-panel {
+  border: 1px dashed var(--border-strong);
+  border-radius: 12px;
+  padding: 8px 12px;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  background: var(--bg-strip);
+}
+
+.debug-panel summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+.debug-panel summary svg {
+  color: var(--accent);
+}
+
+.debug-hint {
+  margin: 6px 0 4px;
+  color: var(--label);
+}
+
+.debug-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  max-height: 132px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.debug-list li {
+  display: flex;
+  gap: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.debug-idx {
+  color: var(--accent-strong);
+  font-weight: 700;
+  min-width: 28px;
+}
+
 /* ============ Toaster ============ */
 
 .toaster {
