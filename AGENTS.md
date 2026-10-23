@@ -245,5 +245,7 @@ plan.follow_up.
   mock data behind the dev-only "Demo data" toggle. See docs/handoff-step-1.md.
 - Step 2 ✅ — real mic capture + Silero VAD chunking (16 k mono WAV chunks, no CDN
   assets, error toasts with Retry). See docs/handoff-step-2.md.
-- Next: Step 3 (ASR backend). One step per session; use the hand-off prompt
+- Step 3 ✅ — faster-whisper small.en ASR backend, /api/transcribe contract+errors,
+  live transcript with in-order chunk uploads. See docs/handoff-step-3.md.
+- Next: Step 4 (LLM analyzer). One step per session; use the hand-off prompt
   template in the PRD (Section 6).
