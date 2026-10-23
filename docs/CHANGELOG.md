@@ -67,10 +67,33 @@ change without an entry here.
 - ORT 1.30 asset resolution: `.mjs` loader path override so inference threads never
   touch a CDN in dev or build.
 
-### Known gaps (by plan)
-- ASR backend (`/api/transcribe`), live transcript text, WORDS counter and CTA wiring
-  arrive in Step 3 (`backend/asr.py` faster-whisper small.en int8).
-- Chat drawer and AI analysis remain Step 4/5; mock data still behind the dev toggle.
+### [0.3.0] — Step 3 — 2026-10-24
+
+### Added
+- `POST /api/transcribe` behind the `Transcriber` interface: faster-whisper
+  `small.en` (int8, CPU, 4 threads, beam 5) — all tunable via `.env`. Uploaded
+  chunk audio decodes through `av` to 16 kHz float32; errors 400/413/415/422/503 in
+  the PRD error contract. `GET /api/health` now flips `model_ready` to true once
+  the model is loaded.
+- Background ASR preload at backend startup (`MEDISCRIPT_ASR_AUTOLOAD`, disabled in
+  tests); the model downloads once into the HuggingFace cache on first start.
+- Live transcript flow: `frontend/src/lib/api.ts` (`transcribeChunk`) +
+  `frontend/src/lib/chunkUploader.ts` — serial upload queue so transcript order
+  matches chunk order, failure toasts with Retry, live strip flips
+  "Listening… ⇄ Transcribing…", WORDS chip counts the growing transcript.
+- Save Recording now also downloads the transcript `.txt` when text exists.
+- Test suite grows to 10 backend tests (contract + error shapes with a
+  deterministic stub transcriber); Playwright E2E for the live-transcript path
+  (`docs/verify_step3_transcribe.py`) + real-inference smoke
+  (`docs/smoke_transcribe.py`).
+
+### Fixed
+- Pinned `av>=11,<16` — faster-whisper 1.2.1 uses `av.open(metadata_errors=…)`,
+  removed in av 19 (pip default), which broke chunk decoding with a 415.
+
+## Known gaps (by plan)
+- ASR chunk latency ~1.0× real-time on CPU int8 (fine for live dictation pace).
+- `/api/analyze` + `/api/chat` remain Steps 4–5; mock data still behind the dev toggle.
 
 **Run:** `run.bat` (Windows) → http://localhost:5173 (frontend) · http://localhost:8000
 reads `/api/health` (backend). Vite dev server on 5173 proxies `/api` to 8000.

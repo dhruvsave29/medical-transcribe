@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import { recorder } from '../audio/recorder'
 import type { RecorderErrorKind } from '../audio/recorder'
 import { useSessionStore } from '../store/sessionStore'
+import { chunkUploader } from '../lib/chunkUploader'
 
 const ERROR_MESSAGES: Record<RecorderErrorKind, string> = {
   permission_denied: 'Microphone permission denied — allow the mic in your browser and retry.',
@@ -10,6 +11,11 @@ const ERROR_MESSAGES: Record<RecorderErrorKind, string> = {
   insecure_context: 'Microphone capture needs HTTPS or localhost.',
   model_load_failed: 'Speech model (VAD) failed to load — retry; if it persists, restart the dev server.',
   unknown: 'Could not start the microphone.',
+}
+
+const onChunkArrived = (chunk: Parameters<typeof chunkUploader.enqueue>[0]): void => {
+  useSessionStore.getState().recordChunk(chunk.record)
+  chunkUploader.enqueue(chunk)
 }
 
 const stamp = (): string => {
@@ -36,7 +42,7 @@ export function useRecorder() {
     store.startRecording()
     try {
       await recorder.start({
-        onChunk: ({ record }) => useSessionStore.getState().recordChunk(record),
+        onChunk: onChunkArrived,
         onMisfire: () => undefined,
       })
     } catch (error) {
@@ -89,7 +95,7 @@ export function useRecorder() {
 
 // Dev-only introspection for automated tests (rejected in production builds).
 if (import.meta.env.DEV) {
-  ;(window as unknown as { __mediscript: unknown }).__mediscript = { recorder }
+  ;(window as unknown as { __mediscript: unknown }).__mediscript = { recorder, chunkUploader }
 }
 
 /** Retry path used from toast actions (needs the hook-free store API). */
@@ -99,7 +105,7 @@ function useRecorderStart(): void {
     store.startRecording()
     try {
       await recorder.start({
-        onChunk: ({ record }) => useSessionStore.getState().recordChunk(record),
+        onChunk: onChunkArrived,
       })
     } catch (error) {
       const kind =

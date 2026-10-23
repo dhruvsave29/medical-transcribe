@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     whisper_model: str = "small.en"
     whisper_device: str = "cpu"
     whisper_compute_type: str = "int8"
+    whisper_cpu_threads: int = 4
+    whisper_beam_size: int = 5
 
     llm_base_url: str = "http://127.0.0.1:11434/v1"
     llm_model: str = "qwen2.5:3b"

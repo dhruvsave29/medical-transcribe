@@ -53,6 +53,8 @@ interface SessionState {
   refreshBackendStatus: () => Promise<void>
   setEditedSummary: (v: string) => void
   recordChunk: (record: ChunkRecord) => void
+  /** Append one ASR chunk result to the running transcript (chunks arrive in order). */
+  appendTranscript: (text: string) => void
   recorderFailure: (kind: RecorderErrorKind) => void
   pushToast: (kind: ToastKind, message: string, action?: ToastAction) => void
   dismissToast: (id: number) => void
@@ -141,6 +143,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       chunkCount: record.index,
       recorderEvents: [...s.recorderEvents.slice(-39), record],
       audioCaptured: true,
+    }))
+  },
+
+  appendTranscript: (text) => {
+    set((s) => ({
+      transcript: s.transcript ? `${s.transcript} ${text}`.trim() : text,
     }))
   },
 

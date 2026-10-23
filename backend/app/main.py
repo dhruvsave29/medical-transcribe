@@ -1,26 +1,42 @@
 """MediScript backend entrypoint.
 
-Step 1 of the build plan: FastAPI app with /api/health only.
-Later steps add /api/transcribe, /api/analyze and /api/chat behind
-Transcriber / Analyzer interfaces.
+Step 3 of the build plan: /api/health + /api/transcribe (faster-whisper,
+local CPU). Later steps add /api/analyze and /api/chat behind an Analyzer
+interface.
 """
 
-from pathlib import Path
+import logging
+from contextlib import asynccontextmanager
+from typing import Annotated
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from . import asr_state
+from .asr import TranscriberError, maybe_autoload
 from .config import settings
+
+# App-level logs (model load, per-request sizes/durations — never transcript text).
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """Download/load the ASR model in the background on first backend start."""
+    maybe_autoload()
+    yield
+
 
 app = FastAPI(
     title="MediScript API",
-    version="0.1.0",
+    version="0.3.0",
     docs_url="/api/docs",
     redoc_url=None,
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -77,11 +93,47 @@ async def validation_exception_handler(
 async def health() -> dict:
     """Liveness + configuration report.
 
-    model_ready flips to true in Step 3 once the Whisper model has loaded.
+    model_ready flips to true once the Whisper model has loaded (background
+    preload or first /api/transcribe call).
     """
     return {
         "status": "ok",
         "asr": f"faster-whisper/{settings.whisper_model}",
         "llm": f"ollama/{settings.llm_model}",
-        "model_ready": False,
+        "model_ready": asr_state.transcriber.is_ready,
+    }
+
+
+@app.post("/api/transcribe")
+async def transcribe(
+    audio: Annotated[UploadFile, File()],
+    chunk_index: Annotated[int, Form(ge=0)],
+    language: Annotated[str | None, Form(max_length=8)] = None,
+) -> dict:
+    """One VAD speech segment in (16 kHz mono WAV from the browser), text out.
+
+    Contract (PRD 3.2): {"chunk_index", "text", "duration_ms"}.
+    """
+    contents = await audio.read()
+    if len(contents) == 0:
+        raise HTTPException(status_code=400, detail="Empty audio upload.")
+    if len(contents) > settings.max_upload_mb * 1024 * 1024:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Audio larger than {settings.max_upload_mb} MB.",
+        )
+
+    try:
+        text, duration = asr_state.transcriber.transcribe(contents, language)
+    except TranscriberError as exc:
+        raise HTTPException(status_code=415, detail=str(exc)) from exc
+    except Exception as exc:  # model/runtime failure — retryable client-side
+        raise HTTPException(
+            status_code=503, detail="Transcription service unavailable."
+        ) from exc
+
+    return {
+        "chunk_index": chunk_index,
+        "text": text,
+        "duration_ms": int(round(duration * 1000)),
     }
