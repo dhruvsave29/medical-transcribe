@@ -1,0 +1,193 @@
+import { useEffect, useRef, useState } from 'react'
+import { useSessionStore, wordCountOf } from '../store/sessionStore'
+import { Icon } from './Icon'
+
+export function TranscriptionCard() {
+  const status = useSessionStore((s) => s.status)
+  const transcript = useSessionStore((s) => s.transcript)
+  const chunkCount = useSessionStore((s) => s.chunkCount)
+  const liveLabel = useSessionStore((s) => s.liveLabel)
+  const startRecording = useSessionStore((s) => s.startRecording)
+  const stopRecording = useSessionStore((s) => s.stopRecording)
+  const clearTranscript = useSessionStore((s) => s.clearTranscript)
+  const beginProcessing = useSessionStore((s) => s.beginProcessing)
+  const endProcessing = useSessionStore((s) => s.endProcessing)
+  const setMock = useSessionStore((s) => s.setMock)
+  const pushToast = useSessionStore((s) => s.pushToast)
+
+  const boxRef = useRef<HTMLDivElement>(null)
+  const [confirmingClear, setConfirmingClear] = useState(false)
+
+  const words = wordCountOf(transcript)
+  const hasText = transcript.trim().length > 0
+
+  useEffect(() => {
+    const el = boxRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [transcript])
+
+  const onStart = () => {
+    startRecording()
+    pushToast('info', 'Microphone capture and VAD are wired in Step 2 — UI state is already live.')
+  }
+
+  const onStop = () => {
+    stopRecording()
+  }
+
+  const onClear = () => {
+    if (!hasText) {
+      clearTranscript()
+      return
+    }
+    if (!confirmingClear) {
+      setConfirmingClear(true)
+      window.setTimeout(() => setConfirmingClear(false), 4000)
+      return
+    }
+    setConfirmingClear(false)
+    clearTranscript()
+    pushToast('success', 'Transcript cleared.')
+  }
+
+  const onSave = () => {
+    pushToast('info', 'Audio download activates with recording (Step 2).')
+  }
+
+  const onProcess = async () => {
+    if (!hasText) return
+    beginProcessing()
+    try {
+      const res = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcript }),
+      })
+      if (res.status === 404 || res.status === 501) {
+        endProcessing()
+        pushToast('info', 'AI analysis ships in Step 4. Use the Demo data toggle to preview the summary card now.', {
+          label: 'Preview demo',
+          run: () => setMock(true),
+        })
+        return
+      }
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null
+        endProcessing()
+        pushToast('error', body?.error?.message ?? 'Analysis failed. Please try again.', {
+          label: 'Retry',
+          run: () => void onProcess(),
+        })
+        return
+      }
+      const summary = await res.json()
+      useSessionStore.setState({ summary, summaryEditedText: null })
+      endProcessing()
+      pushToast('success', 'Clinical summary ready.')
+    } catch {
+      endProcessing()
+      pushToast('error', 'Backend not reachable. Start it with run.bat (Windows) or run.sh.', {
+        label: 'Retry',
+        run: () => void onProcess(),
+      })
+    }
+  }
+
+  const stripVisible = status === 'recording' || status === 'processing'
+  const liveStrip = liveLabel === 'Analysing…' && status === 'processing' ? 'Analysing…' : liveLabel
+
+  return (
+    <section className="card" aria-labelledby="transcription-title">
+      <div className="card__title">
+        <Icon name="mic" size={22} />
+        <h2 id="transcription-title">Live Medical Transcription</h2>
+      </div>
+
+      <div className="controls">
+        <button
+          type="button"
+          className={`btn btn--primary${status === 'recording' ? ' btn--recording' : ''}`}
+          onClick={onStart}
+          disabled={status === 'recording' || status === 'processing'}
+          aria-label="Start microphone recording"
+        >
+          <Icon name="mic" size={16} className="btn__icon" />
+          {status === 'recording' ? 'Recording…' : 'Start Mic'}
+        </button>
+        <button
+          type="button"
+          className="btn btn--danger"
+          onClick={onStop}
+          disabled={status !== 'recording'}
+          aria-label="Stop recording"
+        >
+          <Icon name="stop" size={16} className="btn__icon" />
+          Stop
+        </button>
+        <button
+          type="button"
+          className="btn btn--muted"
+          onClick={onClear}
+          disabled={status === 'recording' || status === 'processing'}
+          aria-label="Clear transcript and counters"
+          title={confirmingClear ? 'Click again to confirm' : 'Clear transcript and counters'}
+        >
+          <Icon name="trash" size={16} className="btn__icon" />
+          {confirmingClear ? 'Confirm clear?' : 'Clear'}
+        </button>
+        <button
+          type="button"
+          className="btn btn--success"
+          onClick={onSave}
+          disabled
+          aria-label="Save recording (available after Step 2)"
+          title="Audio saving is wired to the recorder in Step 2"
+        >
+          <Icon name="download" size={16} className="btn__icon" />
+          Save Recording
+        </button>
+      </div>
+
+      <div className="chips">
+        <span className="chip">Words: {words}</span>
+        <span className="chip">Chunks: {chunkCount}</span>
+      </div>
+
+      {stripVisible && (
+        <div className={`live-strip${liveStrip === 'Listening…' ? '' : ' is-quiet'}`} role="status">
+          <span className="live-strip__dot" aria-hidden="true" />
+          {liveStrip ?? 'Listening…'}
+        </div>
+      )}
+
+      <div
+        ref={boxRef}
+        className="transcript-box"
+        aria-live="polite"
+        aria-label="Live transcript"
+      >
+        {hasText ? (
+          transcript
+        ) : (
+          <div className="transcript-placeholder">
+            <Icon name="wand" size={16} />
+            <span>
+              Ready — click Start Mic and speak naturally. VAD will auto-chunk your speech.
+            </span>
+          </div>
+        )}
+      </div>
+
+      <button
+        type="button"
+        className="btn btn--primary btn--block"
+        onClick={() => void onProcess()}
+        disabled={status !== 'stopped' || !hasText}
+        aria-label="Process transcript with AI"
+      >
+        <Icon name="zap" size={16} className="btn__icon" />
+        Process Transcript with AI
+      </button>
+    </section>
+  )
+}

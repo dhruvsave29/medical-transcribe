@@ -1,0 +1,20 @@
+# Node / Vite
+node_modules/
+frontend/dist/
+*.tsbuildinfo
+
+# Python
+backend/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Secrets & runtime logs
+.env
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
