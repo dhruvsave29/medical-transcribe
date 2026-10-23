@@ -247,5 +247,7 @@ plan.follow_up.
   assets, error toasts with Retry). See docs/handoff-step-2.md.
 - Step 3 ✅ — faster-whisper small.en ASR backend, /api/transcribe contract+errors,
   live transcript with in-order chunk uploads. See docs/handoff-step-3.md.
-- Next: Step 4 (LLM analyzer). One step per session; use the hand-off prompt
+- Step 4 ✅ — local Ollama analyzer /api/analyze with validated ClinicalSummary,
+  Analysing… CTA state. See docs/handoff-step-4.md.
+- Next: Step 5 (chat drawer). One step per session; use the hand-off prompt
   template in the PRD (Section 6).
