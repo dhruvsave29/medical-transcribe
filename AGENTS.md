@@ -243,5 +243,7 @@ plan.follow_up.
 
 - Step 1 ✅ — foundation, design tokens, static two-card UI, run scripts, /api/health,
   mock data behind the dev-only "Demo data" toggle. See docs/handoff-step-1.md.
-- Next: Step 2 (mic capture + VAD). One step per session; use the hand-off prompt
+- Step 2 ✅ — real mic capture + Silero VAD chunking (16 k mono WAV chunks, no CDN
+  assets, error toasts with Retry). See docs/handoff-step-2.md.
+- Next: Step 3 (ASR backend). One step per session; use the hand-off prompt
   template in the PRD (Section 6).
