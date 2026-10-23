@@ -3,6 +3,27 @@
 All notable changes per build step. Contracts in the PRD (AGENTS.md sections 1–3) must not
 change without an entry here.
 
+## [1.0.0] — Step 6 — 2026-10-24
+
+### Final assembly (cold-start verified)
+- **Cold-start test passed**: wiped `.venv`, `node_modules` and `.env`, ran
+  `run.bat` from scratch — `.env` created, venv + deps installed, Ollama
+  checked, servers launched, Whisper preloaded (`model_ready: true`), app live
+  at :5173, then the full verification battery re-run green.
+- `run.bat` fixed: Ollama resolved through PATH *plus* the two known install
+  locations (a fresh winget install leaves PATH stale in the current shell, so
+  the old script silently skipped the model pull); single idempotent
+  `npm install`; explicit `goto backend_setup` flow.
+- `backend/requirements-dev.txt` added (pytest + httpx) so a fresh machine can
+  run the 24-test backend suite; documented in the README.
+- README updated: full config table, real API contracts, build-status table,
+  verification assets.
+- Sweep: no TODOs, no dead buttons, no placeholder logic in shipped code; every
+  PRD 2.x control demonstrated working in E2E.
+- Final screenshots: `docs/final-desktop.png`, `docs/final-mobile.png`.
+- Earlier steps' verification is recorded in `docs/handoff-step-*.md`; suites:
+  `docs/verify_step{2,3,4,5}_*.py`, smokes `docs/smoke_{transcribe,analyze,chat}.py`.
+
 ## [0.1.0] — Step 1 — 2026-10-23
 
 ### Added

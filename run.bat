@@ -25,32 +25,37 @@ if exist ".env" (
 )
 
 echo [MediScript] Step 2/5 - Ollama (local LLM, no API key)
+set "OLLAMA_EXE="
 where ollama >nul 2>nul
-if errorlevel 1 (
+if not errorlevel 1 set "OLLAMA_EXE=ollama"
+if not defined OLLAMA_EXE if exist "%LOCALAPPDATA%\Programs\Ollama\ollama.exe" set "OLLAMA_EXE=%LOCALAPPDATA%\Programs\Ollama\ollama.exe"
+if not defined OLLAMA_EXE if exist "C:\Program Files\Ollama\ollama.exe" set "OLLAMA_EXE=C:\Program Files\Ollama\ollama.exe"
+if not defined OLLAMA_EXE (
   echo [MediScript] Ollama not found. Attempting silent install via winget...
   winget install --id Ollama.Ollama -e --silent --accept-package-agreements --accept-source-agreements >nul 2>nul
-  if errorlevel 1 (
-    echo [MediScript] AUTOMATIC INSTALL FAILED. Recovery command ^(may ask for administrator approval^):
-    echo     winget install --id Ollama.Ollama -e --accept-package-agreements --accept-source-agreements
-    echo [MediScript] Continuing - transcription works; AI summary/chat need Ollama.
-  )
+  if exist "%LOCALAPPDATA%\Programs\Ollama\ollama.exe" set "OLLAMA_EXE=%LOCALAPPDATA%\Programs\Ollama\ollama.exe"
+  if not defined OLLAMA_EXE if exist "C:\Program Files\Ollama\ollama.exe" set "OLLAMA_EXE=C:\Program Files\Ollama\ollama.exe"
 )
-where ollama >nul 2>nul
-if not errorlevel 1 (
-  curl -fsS http://127.0.0.1:11434/api/version >nul 2>nul
-  if errorlevel 1 (
-    echo [MediScript] Starting Ollama service...
-    start "Ollama service" /min cmd /c "ollama serve >nul 2>nul"
-    timeout /t 3 /nobreak >nul
-  )
-  ollama list 2>nul | findstr /c:"%LLM_MODEL%" >nul
-  if errorlevel 1 (
-    echo [MediScript] Pulling local model %LLM_MODEL% ^(one-time download^)...
-    ollama pull %LLM_MODEL%
-    if errorlevel 1 echo [MediScript] Model pull failed - run manually: ollama pull %LLM_MODEL%
-  )
+if not defined OLLAMA_EXE (
+  echo [MediScript] AUTOMATIC INSTALL FAILED. Recovery command ^(may ask for administrator approval^):
+  echo     winget install --id Ollama.Ollama -e --accept-package-agreements --accept-source-agreements
+  echo [MediScript] Continuing - transcription works; AI summary/chat need Ollama.
+  goto backend_setup
+)
+curl -fsS http://127.0.0.1:11434/api/version >nul 2>nul
+if errorlevel 1 (
+  echo [MediScript] Starting Ollama service...
+  start "Ollama service" /min cmd /c ""%OLLAMA_EXE%" serve >nul 2>nul"
+  timeout /t 3 /nobreak >nul
+)
+"%OLLAMA_EXE%" list 2>nul | findstr /c:"%LLM_MODEL%" >nul
+if errorlevel 1 (
+  echo [MediScript] Pulling local model %LLM_MODEL% ^(one-time download^)...
+  "%OLLAMA_EXE%" pull %LLM_MODEL%
+  if errorlevel 1 echo [MediScript] Model pull failed - run manually: ollama pull %LLM_MODEL%
 )
 
+:backend_setup
 echo [MediScript] Step 3/5 - Python backend
 if not exist "backend\.venv\Scripts\python.exe" (
   echo [MediScript] Creating Python virtual environment...
@@ -74,18 +79,14 @@ echo [MediScript] Backend dependencies ready.
 
 echo [MediScript] Step 4/5 - Frontend dependencies
 pushd frontend
-if not exist "node_modules" (
-  echo [MediScript] Installing npm dependencies ^(one-time^)...
-  call npm install --no-fund --no-audit
-  if errorlevel 1 (
-    echo [MediScript] npm install failed. Recovery command:
-    echo     cd frontend ^&^& npm install
-    popd
-    pause
-    exit /b 1
-  )
-) else (
-  call npm install --no-fund --no-audit
+echo [MediScript] Installing npm dependencies (idempotent - instant if present)...
+call npm install --no-fund --no-audit
+if errorlevel 1 (
+  echo [MediScript] npm install failed. Recovery command:
+  echo     cd frontend ^&^& npm install
+  popd
+  pause
+  exit /b 1
 )
 popd
 

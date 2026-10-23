@@ -251,6 +251,7 @@ plan.follow_up.
   Analysing… CTA state. See docs/handoff-step-4.md.
 - Step 5 ✅ — floating chat drawer + /api/chat grounded-refusal assistant. See
   docs/handoff-step-5.md.
-- Next: Step 6 (final assembly — cold-run checks, docs wrap-up, then GitHub
-  export last). One step per session; use the hand-off prompt template in the
-  PRD (Section 6).
+- Step 6 ✅ — final assembly: cold-start verified (wiped venv/node_modules/.env →
+  run.bat → all suites green), run.bat PATH-robust Ollama, requirements-dev,
+  README final. Feature complete per PRD. See docs/handoff-step-6.md.
+- Remaining: GitHub export (user instruction: export last).
