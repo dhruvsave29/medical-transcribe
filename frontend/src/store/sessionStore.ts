@@ -13,6 +13,11 @@ export interface ToastAction {
   run: () => void
 }
 
+export interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
 export interface ToastItem {
   id: number
   kind: ToastKind
@@ -40,6 +45,9 @@ interface SessionState {
   recorderEvents: ChunkRecord[]
   /** True once any speech audio has been captured this session. */
   audioCaptured: boolean
+  /** Assistant chat drawer messages (newest last). */
+  chatMessages: ChatMessage[]
+  chatBusy: boolean
 
   startRecording: () => void
   stopRecording: () => void
@@ -55,6 +63,9 @@ interface SessionState {
   recordChunk: (record: ChunkRecord) => void
   /** Append one ASR chunk result to the running transcript (chunks arrive in order). */
   appendTranscript: (text: string) => void
+  addChatMessage: (role: ChatMessage['role'], content: string) => void
+  setChatBusy: (v: boolean) => void
+  clearChat: () => void
   recorderFailure: (kind: RecorderErrorKind) => void
   pushToast: (kind: ToastKind, message: string, action?: ToastAction) => void
   dismissToast: (id: number) => void
@@ -74,6 +85,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   toasts: [],
   recorderEvents: [],
   audioCaptured: false,
+  chatMessages: [],
+  chatBusy: false,
 
   startRecording: () => {
     if (get().status === 'processing') return
@@ -93,6 +106,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       liveLabel: null,
       recorderEvents: [],
       audioCaptured: false,
+      chatMessages: [],
+      chatBusy: false,
     })
   },
 
@@ -151,6 +166,14 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       transcript: s.transcript ? `${s.transcript} ${text}`.trim() : text,
     }))
   },
+
+  addChatMessage: (role, content) => {
+    set((s) => ({ chatMessages: [...s.chatMessages, { role, content }].slice(-40) }))
+  },
+
+  setChatBusy: (v) => set({ chatBusy: v }),
+
+  clearChat: () => set({ chatMessages: [], chatBusy: false }),
 
   recorderFailure: (_kind) => {
     void _kind

@@ -93,7 +93,24 @@ change without an entry here.
 
 ## Known gaps (by plan)
 - ASR chunk latency ~1.0× real-time on CPU int8 (fine for live dictation pace).
-- `/api/chat` remains Step 5.
+- GitHub export happens after Step 6 (user's flow).
+
+## [0.5.0] — Step 5 — 2026-10-24
+
+### Added
+- `POST /api/chat` (PRD 3.2 contract): transcript+summary+message → `{"reply"}`,
+  answered strictly from the transcript/summary with the enforced
+  "does not contain" refusal; summary field validated as ClinicalSummary or null.
+- `Analyzer.chat()` on the shared Ollama client (temp 0, grounded-only prompt).
+- Real chat drawer replaces the Step-1 placeholder: bubbles, Thinking… state,
+  Enter-to-send, clear-chat, disabled-with-hint until a transcript exists,
+  error toasts with Retry.
+- Shared typed API helpers (`chatWithAssistant`, `analyzeTranscript`) — CTA
+  migrated off the ad-hoc fetch.
+- 7 new backend tests (24 total) + chat smoke + Playwright E2E
+  (`docs/verify_step5_chat.py`, screenshot `docs/step5-chat.png`).
+
+**Run:** `run.bat`. All five steps now verified end-to-end with local inference.
 
 ## [0.4.0] — Step 4 — 2026-10-24
 

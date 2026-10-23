@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSessionStore, wordCountOf } from '../store/sessionStore'
 import { useRecorder } from '../hooks/useRecorder'
+import { analyzeTranscript, ApiError } from '../lib/api'
 import { RecorderDebugPanel } from './RecorderDebugPanel'
 import { Icon } from './Icon'
 
@@ -12,7 +13,6 @@ export function TranscriptionCard() {
   const audioCaptured = useSessionStore((s) => s.audioCaptured)
   const beginProcessing = useSessionStore((s) => s.beginProcessing)
   const endProcessing = useSessionStore((s) => s.endProcessing)
-  const setMock = useSessionStore((s) => s.setMock)
   const pushToast = useSessionStore((s) => s.pushToast)
 
   const { start, stop, saveSession, clearSession } = useRecorder()
@@ -49,38 +49,22 @@ export function TranscriptionCard() {
     if (!hasText) return
     beginProcessing()
     try {
-      const res = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript }),
-      })
-      if (res.status === 404 || res.status === 501) {
-        endProcessing()
-        pushToast('info', 'AI analysis ships in Step 4. Use the Demo data toggle to preview the summary card now.', {
-          label: 'Preview demo',
-          run: () => setMock(true),
-        })
-        return
-      }
-      if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null
-        endProcessing()
-        pushToast('error', body?.error?.message ?? 'Analysis failed. Please try again.', {
-          label: 'Retry',
-          run: () => void onProcess(),
-        })
-        return
-      }
-      const summary = await res.json()
+      const summary = await analyzeTranscript(useSessionStore.getState().transcript)
       useSessionStore.setState({ summary, summaryEditedText: null })
       endProcessing()
       pushToast('success', 'Clinical summary ready.')
-    } catch {
+    } catch (error) {
       endProcessing()
-      pushToast('error', 'Backend not reachable. Start it with run.bat (Windows) or run.sh.', {
-        label: 'Retry',
-        run: () => void onProcess(),
-      })
+      const message = error instanceof ApiError ? error.message : 'Analysis failed.'
+      const offline = error instanceof ApiError && error.status === 0
+      pushToast(
+        'error',
+        offline ? 'Backend not reachable. Start it with run.bat (Windows) or run.sh.' : message,
+        {
+          label: 'Retry',
+          run: () => void onProcess(),
+        },
+      )
     }
   }
 

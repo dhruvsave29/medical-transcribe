@@ -5,6 +5,7 @@ local CPU). Later steps add /api/analyze and /api/chat behind an Analyzer
 interface.
 """
 
+import json
 import logging
 from contextlib import asynccontextmanager
 from typing import Annotated
@@ -19,6 +20,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from . import analyzer_state, asr_state
 from .analyzer import AnalyzerError
 from .asr import TranscriberError, maybe_autoload
+from .summary import ClinicalSummary
 from .config import settings
 
 # App-level logs (model load, per-request sizes/durations — never transcript text).
@@ -173,3 +175,48 @@ async def analyze(request: Request) -> JSONResponse:
         status_code=200,
         content=jsonable_encoder(summary.model_dump(mode="json")),
     )
+
+
+@app.post("/api/chat")
+async def chat(request: Request) -> dict:
+    """Consultation assistant: answers only from the transcript + summary.
+
+    Contract (PRD 3.2): {"transcript", "summary", "message"} -> {"reply"}.
+    The summary field may be a validated ClinicalSummary object or null.
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Body must be JSON.")
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=422, detail="Body must be a JSON object.")
+    if not isinstance(body.get("message"), str) or not body["message"].strip():
+        raise HTTPException(
+            status_code=422, detail="Field 'message' (non-empty string) is required."
+        )
+    message: str = body["message"].strip()
+    if not isinstance(body.get("transcript"), str) or not body["transcript"].strip():
+        raise HTTPException(status_code=400, detail="Transcript is empty.")
+
+    transcript: str = body["transcript"].strip()
+    summary_json = ""
+    if body.get("summary") is not None:
+        try:
+            summary = ClinicalSummary.model_validate(body["summary"])
+        except Exception:
+            raise HTTPException(
+                status_code=422, detail="Field 'summary' does not match the ClinicalSummary schema."
+            )
+        summary_json = json.dumps(summary.model_dump(mode="json"), ensure_ascii=False)
+
+    try:
+        reply = analyzer_state.analyzer.chat(transcript, summary_json, message)
+    except AnalyzerError as exc:
+        raise HTTPException(status_code=503, detail=str(exc) + " — retry.") from exc
+    except Exception as exc:
+        logger.error("chat failed: %s", type(exc).__name__)
+        raise HTTPException(
+            status_code=503, detail="Local LLM chat unavailable — retry."
+        ) from exc
+
+    return {"reply": reply}

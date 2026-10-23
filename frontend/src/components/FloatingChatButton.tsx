@@ -1,13 +1,61 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Icon } from './Icon'
+import { useSessionStore } from '../store/sessionStore'
+import { ApiError, chatWithAssistant } from '../lib/api'
 
 /**
- * Floating assistant entry point. The working chat drawer itself is built in
- * Step 5; until then the drawer opens and states that clearly. This is a
- * documented known gap for Step 1, not a hidden dead button.
+ * Floating assistant chat (PRD 2.3): /api/chat answers strictly from the
+ * current transcript + summary. Errors toast with a Retry that re-sends the
+ * last message. The drawer keeps its messages in the store until Clear.
  */
 export function FloatingChatButton() {
   const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState('')
+  const messages = useSessionStore((s) => s.chatMessages)
+  const busy = useSessionStore((s) => s.chatBusy)
+  const transcript = useSessionStore((s) => s.transcript)
+
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const hasTranscript = transcript.trim().length > 0
+
+  useEffect(() => {
+    const el = bodyRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [messages.length, busy, open])
+
+  const send = async (text: string): Promise<void> => {
+    const message = text.trim()
+    if (!message || busy || !hasTranscript) return
+    const store = useSessionStore.getState()
+    store.addChatMessage('user', message)
+    store.setChatBusy(true)
+    setDraft('')
+    try {
+      const reply = await chatWithAssistant(
+        useSessionStore.getState().transcript,
+        useSessionStore.getState().summary,
+        message,
+      )
+      useSessionStore.getState().addChatMessage('assistant', reply)
+    } catch (error) {
+      const detail =
+        error instanceof ApiError ? error.message : 'Chat request failed.'
+      useSessionStore.getState().pushToast('error', detail, {
+        label: 'Retry',
+        run: () => void send(message),
+      })
+      setDraft(message)
+    } finally {
+      useSessionStore.getState().setChatBusy(false)
+    }
+  }
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      void send(draft)
+    }
+  }
 
   return (
     <>
@@ -34,18 +82,52 @@ export function FloatingChatButton() {
               <Icon name="x" size={16} />
             </button>
           </div>
-          <div className="chat-drawer__body">
-            The transcript-aware assistant chat is activated in Step 5 of the
-            build plan. Questions will be answered strictly from the current
-            transcript and summary.
+          <div className="chat-drawer__body" ref={bodyRef}>
+            {messages.length === 0 && (
+              <p className="chat-drawer__hint">
+                {hasTranscript
+                  ? 'Ask anything from this consultation — answers come only from the transcript and the current summary.'
+                  : 'Record a consultation (or load the demo transcript) first, then ask questions here.'}
+              </p>
+            )}
+            {messages.map((m, i) => (
+              <div key={i} className={`chat-msg chat-msg--${m.role}`}>
+                {m.content}
+              </div>
+            ))}
+            {busy && <div className="chat-msg chat-msg--assistant is-typing">Thinking…</div>}
           </div>
           <div className="chat-drawer__input">
+            <button
+              type="button"
+              className="chat-drawer__input icon-button icon-button--micro"
+              aria-label="Clear assistant chat"
+              title="Clear chat"
+              onClick={() => useSessionStore.getState().clearChat()}
+            >
+              <Icon name="trash" size={14} />
+            </button>
             <textarea
               rows={1}
-              disabled
-              placeholder="Assistant chat comes online in Step 5…"
-              aria-label="Message for the assistant (disabled until Step 5)"
+              value={draft}
+              placeholder={
+                hasTranscript ? 'Ask about the consultation…' : 'Transcript is empty…'
+              }
+              disabled={!hasTranscript || busy}
+              aria-label="Message for the assistant"
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={onKeyDown}
             />
+            <button
+              type="button"
+              className="btn btn--primary chat-drawer__send"
+              disabled={!draft.trim() || busy || !hasTranscript}
+              aria-label="Send message to the assistant"
+              onClick={() => void send(draft)}
+            >
+              <Icon name="zap" size={16} className="btn__icon" />
+              Send
+            </button>
           </div>
         </aside>
       )}

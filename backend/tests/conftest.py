@@ -47,11 +47,19 @@ class StubAnalyzer(Analyzer):
 
     def __init__(self) -> None:
         self.fail = False
+        self.chat_fail = False
+        self.chat_calls: list[tuple[str, str, str]] = []
 
     def analyze(self, transcript: str) -> ClinicalSummary:
         if self.fail:
             raise AnalyzerError("LLM output did not match the clinical summary schema")
         return sample_summary()
+
+    def chat(self, transcript: str, summary_json: str, message: str) -> str:
+        if self.chat_fail:
+            raise AnalyzerError("local LLM chat request failed")
+        self.chat_calls.append((transcript, summary_json, message))
+        return "The transcript reports chest heaviness for three months."
 
 
 def sample_summary() -> ClinicalSummary:
